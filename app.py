@@ -1,31 +1,32 @@
-import streamlit as st
 import numpy as np
-import pickle
-import os
+import streamlit as st
+import matplotlib.pyplot as plt
+import joblib
 
-# --- Definisi Ulang Class Adaline (WAJIB ADA) ---
+# --- Definisi Class Adaline ---
 class Adaline:
-    def __init__(self, learning_rate=0.01, epochs=1000):
+    def __init__(self, learning_rate=0.01, epochs=1000, initial_weights=None):
         self.learning_rate = learning_rate
         self.epochs = epochs
-        self.weights = None
-        self.bias = None
+        self.weights = initial_weights
+        self.bias = 0
         self.loss_history = []
 
     def activation(self, x):
-        return x  # Linear activation untuk Adaline
+        return x
 
     def predict(self, X):
         return self.activation(np.dot(X, self.weights) + self.bias)
 
     def train(self, X, y):
         n_samples, n_features = X.shape
-        self.weights = np.zeros(n_features)
-        self.bias = 0
 
-        for epoch in range(self.epochs):
-            y_predicted = self.predict(X)
-            errors = y - y_predicted
+        if self.weights is None:
+            self.weights = np.zeros(n_features)
+
+        for _ in range(self.epochs):
+            y_pred = self.predict(X)
+            errors = y - y_pred
 
             self.weights += self.learning_rate * np.dot(X.T, errors) / n_samples
             self.bias += self.learning_rate * errors.mean()
@@ -33,76 +34,29 @@ class Adaline:
             mse = np.mean(errors ** 2)
             self.loss_history.append(mse)
 
-            if epoch % 100 == 0:
-                print(f"Epoch {epoch} - MSE: {mse:.6f}")
+# --- UI Streamlit ---
+st.title("Simulasi Adaline - Training Polinomial")
 
-    def save_model(self, filename):
-        with open(filename, 'wb') as f:
-            pickle.dump(self, f)
+# Input parameter dari user
+learning_rate = st.number_input("Learning Rate", min_value=0.0001, max_value=1.0, value=0.01, step=0.001, format="%.4f")
+epochs = st.number_input("Jumlah Iterasi (Epoch)", min_value=100, max_value=10000, value=1000, step=100)
+initial_weight = st.number_input("Bobot Awal (W)", value=0.0)
 
-    @staticmethod
-    def load_model(filename):
-        with open(filename, 'rb') as f:
-            return pickle.load(f)
+if st.button("Adaline (Proses)"):
 
-# --- Load Model ---
-MODEL_PATH = "adaline_polynomial_model.pkl"
+    # Memuat model yang telah disimpan
+    model = joblib.load('model.pkl')
 
-def load_model():
-    with open(MODEL_PATH, "rb") as file:
-        model = pickle.load(file)
-    return model
+    # Tampilkan info hasil
+    st.write(f"Bobot akhir: {model.weights}")
+    st.write(f"Bias akhir: {model.bias}")
+    st.write(f"Galat akhir (MSE): {model.loss_history[-1]:.4f}")
 
-model = load_model()
-
-# --- Streamlit Layout ---
-st.set_page_config(page_title="Solusi Akar Polinomial | Adaline AI", layout="wide")
-
-st.title("🔢 Solusi Akar Persamaan Polinomial Derajat Tinggi")
-st.subheader("Menggunakan Artificial Neural Network Model Adaline")
-st.markdown("---")
-
-# Sidebar Input
-st.sidebar.header("Input Parameter")
-st.sidebar.markdown("**Input Polinomial**")
-
-degree = st.sidebar.number_input("Masukkan Derajat Polinomial (n):", min_value=1, value=2, step=1)
-
-coefficients = []
-for i in range(degree + 1):
-    coef = st.sidebar.number_input(f"Koefisien x^{degree-i}:", format="%.5f", key=f"coef_{i}")
-    coefficients.append(coef)
-
-input_x = st.sidebar.number_input("Masukkan nilai x untuk prediksi:", format="%.4f")
-
-# Action Button
-if st.sidebar.button("Prediksi"):
-    st.markdown("## 📈 Hasil Prediksi")
-
-    # Buat prediksi
-    poly_value = np.polyval(coefficients, input_x)
-    st.write(f"Nilai polinomial di x={input_x} adalah: **{poly_value:.6f}**")
-
-    # Prediksi dengan model Adaline
-    x_input = np.array([[input_x]])
-    adaline_prediction = model.predict(x_input)
-    st.success(f"Hasil prediksi model Adaline di x={input_x}: **{adaline_prediction[0]:.6f}**")
-
-    st.info("Note: Model Adaline ini hasil training dari dataset polinomial contoh. Untuk polinomial baru, perlu re-training.")
-
-# Visualisasi Persamaan
-st.markdown("## 📄 Persamaan Polinomial")
-equation = " + ".join([f"{c:.2f}x^{degree-i}" for i, c in enumerate(coefficients)])
-equation = equation.replace('x^0', '')
-st.latex(equation)
-
-# Tambahan (optional): Gambar Diagram
-if os.path.exists("assets/flowmap.png"):
-    st.markdown("---")
-    st.markdown("## 🛠️ Diagram Flowmap Sistem")
-    st.image("assets/flowmap.png", caption="Flowmap Sistem Solusi Polinomial", use_column_width=True)
-
-# Footer
-st.markdown("---")
-st.caption("© 2025 Solusi Polinomial Adaline | Powered by Streamlit & AI")
-st.markdown("**Disclaimer:** Model ini hanya untuk tujuan edukasi. Hasil prediksi tidak dijamin akurat untuk semua polinomial.")
+    # Grafik MSE
+    st.subheader("Grafik MSE per Epoch")
+    fig, ax = plt.subplots()
+    ax.plot(model.loss_history, color='green')
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Mean Squared Error")
+    ax.set_title("Perkembangan MSE Selama Training")
+    st.pyplot(fig)
